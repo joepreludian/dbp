@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beautiful Prompter</title>
+<script>
+  (function () {
+    try {
+      var stored = localStorage.getItem("bpTheme");
+      var dark = stored ? stored === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+      if (dark) document.documentElement.classList.add("dark");
+    } catch (e) {}
+  })();
+</script>
+<script src="https://cdn.tailwindcss.com/3.4.17?plugins=typography"></script>
+<script>
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        colors: {
+          paper: { bg: "#f6f3ee", surface: "#fbf9f6", border: "#e3ddd3", ink: "#1f1d1a", muted: "#7a6f63" },
+          ink:   { bg: "#15171c", surface: "#1b1e24", border: "#2a2e36", text: "#e6e4df", muted: "#9aa0ab" }
+        }
+      }
+    }
+  };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/15.0.7/marked.min.js"></script>
+<script type="application/json" id="bp-config">__BP_CONFIG__</script>
+<style>
+  html { color-scheme: light; }
+  html.dark { color-scheme: dark; }
+  textarea { resize: none; }
+  textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid #7a6f63; outline-offset: 2px; }
+  html.dark textarea:focus-visible, html.dark button:focus-visible, html.dark a:focus-visible { outline-color: #9aa0ab; }
+  .prose pre { white-space: pre-wrap; word-break: break-word; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body class="h-full bg-paper-bg text-paper-ink dark:bg-ink-bg dark:text-ink-text antialiased">
+
+<div id="app" class="h-full flex flex-col">
+  <header class="flex items-center gap-4 px-5 py-2.5 text-sm border-b border-paper-border bg-paper-surface dark:border-ink-border dark:bg-ink-surface">
+    <span id="brand" class="font-semibold tracking-tight">Beautiful Prompter</span>
+    <span id="pill" class="rounded-full px-3 py-0.5 text-xs bg-paper-border/70 text-paper-muted dark:bg-ink-border dark:text-ink-muted"></span>
+    <span class="flex-1"></span>
+    <button id="theme-toggle" type="button" title="Switch between light and dark" aria-label="Switch between light and dark"
+            class="rounded-md p-1.5 text-paper-muted hover:text-paper-ink dark:text-ink-muted dark:hover:text-ink-text">
+      <svg class="h-4 w-4 dark:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <svg class="hidden h-4 w-4 dark:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+  </header>
+
+  <main class="flex-1 min-h-0">
+    <section id="write" hidden class="h-full grid grid-rows-2 md:grid-rows-1 md:grid-cols-2">
+      <textarea id="editor" spellcheck="true" placeholder="Write your prompt in markdown."
+                class="h-full w-full p-5 font-mono text-[13.5px] leading-relaxed bg-paper-surface border-b md:border-b-0 md:border-r border-paper-border focus:outline-none dark:bg-ink-surface dark:border-ink-border placeholder:text-paper-muted/70 dark:placeholder:text-ink-muted/70"></textarea>
+      <div id="preview" class="h-full overflow-y-auto p-6 prose prose-sm md:prose-base max-w-none dark:prose-invert"></div>
+    </section>
+
+    <section id="show" hidden class="h-full flex flex-col">
+      <div class="flex-1 min-h-0 overflow-y-auto">
+        <article id="document" class="prose prose-sm md:prose-base max-w-3xl mx-auto px-6 py-8 dark:prose-invert"></article>
+      </div>
+      <div class="border-t border-paper-border bg-paper-surface dark:border-ink-border dark:bg-ink-surface">
+        <div class="max-w-3xl mx-auto px-6 pt-4 pb-2">
+          <label for="answer" class="block text-xs mb-1.5 text-paper-muted dark:text-ink-muted">Your answer</label>
+          <textarea id="answer" rows="5" placeholder="What do you think? Markdown works here too."
+                    class="w-full rounded-lg p-3 text-sm leading-relaxed bg-paper-bg border border-paper-border dark:bg-ink-bg dark:border-ink-border placeholder:text-paper-muted/70 dark:placeholder:text-ink-muted/70"></textarea>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="error" hidden role="alert" class="px-5 py-2 text-sm bg-red-50 text-red-800 border-t border-red-200 dark:bg-red-950 dark:text-red-200 dark:border-red-900"></div>
+
+  <footer class="flex items-center gap-4 px-5 py-2.5 text-xs border-t border-paper-border bg-paper-surface text-paper-muted dark:border-ink-border dark:bg-ink-surface dark:text-ink-muted">
+    <span>Markdown. <kbd class="rounded px-1 bg-paper-border/70 dark:bg-ink-border font-mono">Cmd/Ctrl+Enter</kbd> to send</span>
+    <span id="count"></span>
+    <span class="flex-1"></span>
+    <a id="cancel" href="#" class="underline underline-offset-2 hover:text-paper-ink dark:hover:text-ink-text">Cancel</a>
+    <button id="send" type="button" disabled
+            class="rounded-lg px-4 py-1.5 text-sm font-semibold bg-paper-ink text-paper-surface disabled:opacity-40 disabled:cursor-not-allowed dark:bg-ink-text dark:text-ink-bg">Send to Claude</button>
+  </footer>
+</div>
+
+<div id="idle" hidden class="h-full flex items-center justify-center px-6 text-center">
+  <div>
+    <div id="idle-mark" class="mx-auto mb-4 h-12 w-12 rounded-full flex items-center justify-center text-2xl bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">&#10003;</div>
+    <h1 id="idle-title" class="text-lg font-semibold">Sent. Go back to your terminal.</h1>
+    <p id="idle-text" class="mt-1 text-sm text-paper-muted dark:text-ink-muted">Claude has your message. You can close this tab.</p>
+  </div>
+</div>
+
+<script>
+  var COPY = {
+    confirmSend: "Send this to Claude? You won't be able to edit it afterwards.",
+    confirmCancel: "Cancel without sending?",
+    sentTitle: "Sent. Go back to your terminal.",
+    sentText: "Claude has your message. You can close this tab.",
+    cancelledTitle: "Cancelled. Go back to your terminal.",
+    cancelledText: "Nothing was sent. You can close this tab."
+  };
+
+  var cfg = JSON.parse(document.getElementById("bp-config").textContent);
+  var $ = function (id) { return document.getElementById(id); };
+  var done = false;
+  var sending = false;
+
+  function source() { return cfg.mode === "write" ? $("editor") : $("answer"); }
+
+  function refresh() {
+    var text = source().value;
+    $("count").textContent = text.length ? text.length + " chars" : "";
+    $("send").disabled = sending || !text.trim();
+  }
+
+  function renderMarkdown(target, text) {
+    target.innerHTML = marked.parse(text, { gfm: true });
+  }
+
+  function showError(message) {
+    $("error").textContent = message;
+    $("error").hidden = false;
+  }
+
+  function finish(kind) {
+    done = true;
+    $("idle-title").textContent = kind === "sent" ? COPY.sentTitle : COPY.cancelledTitle;
+    $("idle-text").textContent = kind === "sent" ? COPY.sentText : COPY.cancelledText;
+    if (kind !== "sent") {
+      $("idle-mark").className = "mx-auto mb-4 h-12 w-12 rounded-full flex items-center justify-center text-2xl bg-paper-border text-paper-muted dark:bg-ink-border dark:text-ink-muted";
+      $("idle-mark").innerHTML = "&ndash;";
+    }
+    $("app").hidden = true;
+    $("idle").hidden = false;
+  }
+
+  function post(path, body) {
+    body.k = cfg.token;
+    return fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (res.ok && data.ok) return data;
+        throw new Error("Couldn't send (HTTP " + res.status + (data.error ? ": " + data.error : "") + "). Your text is still here. Try again.");
+      });
+    }, function () {
+      throw new Error("Couldn't reach the Beautiful Prompter process. It may have exited. Copy your text before closing this tab.");
+    });
+  }
+
+  function send() {
+    if (done || sending || $("send").disabled) return;
+    if (!confirm(COPY.confirmSend)) return;
+    sending = true;
+    $("error").hidden = true;
+    $("send").textContent = "Sending...";
+    refresh();
+    post("/answer", { text: source().value }).then(function () {
+      finish("sent");
+    }, function (err) {
+      sending = false;
+      $("send").textContent = "Send to Claude";
+      refresh();
+      showError(err.message);
+    });
+  }
+
+  function cancel(event) {
+    if (event) event.preventDefault();
+    if (done || sending) return;
+    if (!confirm(COPY.confirmCancel)) return;
+    post("/cancel", {}).then(function () {
+      finish("cancelled");
+    }, function (err) {
+      showError(err.message);
+    });
+  }
+
+  function toggleTheme() {
+    var dark = document.documentElement.classList.toggle("dark");
+    try { localStorage.setItem("bpTheme", dark ? "dark" : "light"); } catch (e) {}
+  }
+
+  (function init() {
+    var brand = cfg.title || "Beautiful Prompter";
+    $("brand").textContent = brand;
+    document.title = brand;
+
+    if (cfg.mode === "write") {
+      $("pill").textContent = "Writing a prompt for Claude";
+      $("write").hidden = false;
+      var pending = null;
+      $("editor").addEventListener("input", function () {
+        refresh();
+        clearTimeout(pending);
+        pending = setTimeout(function () { renderMarkdown($("preview"), $("editor").value); }, 100);
+      });
+    } else {
+      $("pill").textContent = cfg.file_name;
+      $("show").hidden = false;
+      var doc = $("document");
+      if (cfg.is_markdown) {
+        renderMarkdown(doc, cfg.document);
+      } else {
+        var pre = document.createElement("pre");
+        var code = document.createElement("code");
+        code.textContent = cfg.document;
+        pre.appendChild(code);
+        doc.appendChild(pre);
+      }
+      var meta = document.createElement("p");
+      meta.className = "text-xs text-paper-muted dark:text-ink-muted";
+      meta.textContent = cfg.file_name + " (" + cfg.file_size + " bytes)";
+      doc.insertBefore(meta, doc.firstChild);
+      $("answer").addEventListener("input", refresh);
+    }
+
+    $("send").addEventListener("click", send);
+    $("cancel").addEventListener("click", cancel);
+    $("theme-toggle").addEventListener("click", toggleTheme);
+    document.addEventListener("keydown", function (e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); send(); }
+    });
+    window.addEventListener("beforeunload", function (e) {
+      if (!done && source().value.trim()) { e.preventDefault(); e.returnValue = ""; }
+    });
+    refresh();
+    source().focus();
+  })();
+</script>
+</body>
+</html>
