@@ -1,6 +1,6 @@
 ---
 name: beautiful-prompter
-description: Use when the user says "open in bp", "open in the beautiful prompter", "let me write this in bp", wants to write a long or structured prompt somewhere better than the terminal, or when a generated document (a spec, a plan, a long report) should be reviewed in the browser with the answer returned to the agent.
+description: Use when the user says "open in bp", "open in the beautiful prompter", "let me write this in bp", wants to write a long or structured prompt somewhere better than the terminal, or when a generated document (a spec, a plan, a long report) should be reviewed in the browser with the answer returned to the agent, or right after producing a document the user will want to read in full: offer to show it there.
 ---
 
 # Beautiful Prompter
@@ -32,8 +32,8 @@ capture merges stdout and stderr and is not.
 # write mode (answer path chosen up front, written literally)
 python3 "${CLAUDE_PLUGIN_ROOT}/bin/bp.pyz" write --output /path/to/scratchpad/bp-answer-1763600000.md
 
-# show mode (the file path as the user would type it)
-python3 "${CLAUDE_PLUGIN_ROOT}/bin/bp.pyz" show docs/specs/design.md --output /path/to/scratchpad/bp-answer-1763600000.md
+# show mode (absolute path to the file)
+python3 "${CLAUDE_PLUGIN_ROOT}/bin/bp.pyz" show /path/to/project/docs/specs/design.md --output /path/to/scratchpad/bp-answer-1763600000.md
 ```
 
 Run the command with `run_in_background: true`. Then:
@@ -48,6 +48,8 @@ Run the command with `run_in_background: true`. Then:
    file into your message, never retype it (one dropped character means a
    "forbidden" page). Tell them to open it in their browser and come back
    when they have sent their answer.
+   When the URL host is local, the tool opens a browser tab itself, so the
+   tab may already be open when the user reads your message.
 2. End your turn and wait for the exit notification. Do not poll.
 3. On exit code 0, read the answer file and treat its content as the user's
    next message (write mode) or as their answer about the file (show mode).
@@ -64,8 +66,9 @@ the process waits indefinitely), `--title TEXT` (heading in the page),
 | 1 | user pressed Cancel; no file | say so, ask how to proceed |
 | 2 | usage error; message on stderr | fix the invocation (missing file, bad port) |
 | 124 | `--timeout` expired; no file | say so, ask whether to open it again |
+| 130 | process was killed (Ctrl-C, SIGTERM); no file | say so, ask whether to open it again |
 
-Never re-run `bp` on your own after 1 or 124. The user made that choice or
+Never re-run `bp` on your own after 1, 124 or 130. The user made that choice or
 walked away; ask.
 
 ## Remote browsers
