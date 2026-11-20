@@ -44,8 +44,10 @@ Run the command with `run_in_background: true`. Then:
    If the line is not there yet, read the file once more; if it is still
    missing, say so and end your turn anyway. The exit notification will
    report a failed start.
-   Relay that URL to the user verbatim, with the token. Tell them to open it
-   in their browser and come back when they have sent their answer.
+   Relay that URL to the user verbatim, with the token: copy it from the
+   file into your message, never retype it (one dropped character means a
+   "forbidden" page). Tell them to open it in their browser and come back
+   when they have sent their answer.
 2. End your turn and wait for the exit notification. Do not poll.
 3. On exit code 0, read the answer file and treat its content as the user's
    next message (write mode) or as their answer about the file (show mode).
