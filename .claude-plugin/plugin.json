@@ -1,7 +1,7 @@
 {
   "name": "beautiful-prompter",
   "description": "Open a local web page to write a long prompt in markdown, or to review a generated document and answer it. One process per call; the answer comes back to the agent.",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "author": {
     "name": "Jon Trigueiro"
   },
