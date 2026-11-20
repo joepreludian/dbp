@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import os
+import secrets
+import signal
 import sys
+import webbrowser
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
@@ -91,19 +95,91 @@ def load_document(path: Path) -> str:
         raise UsageError(f"not valid UTF-8: {path}") from exc
 
 
-def main(argv: list[str] | None = None) -> int:
-    import os
+class _Interrupted(Exception):
+    """Raised from the signal handler to unwind the wait."""
 
+
+def should_open_browser(opts: Options) -> bool:
+    return opts.open_browser and opts.url_host in ("localhost", "127.0.0.1")
+
+
+def write_output_atomic(path: Path, text: str) -> None:
+    """Write text to path so the file either exists complete or not at all."""
+    path = Path(path)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    data = text.encode("utf-8")
+    with open(tmp, "wb") as fh:
+        fh.write(data)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, path)
+
+
+def build_config(opts: Options, document: str | None, token: str) -> dict:
+    config: dict = {"mode": opts.mode, "token": token, "title": opts.title, "version": __version__}
+    if opts.mode == "show":
+        assert opts.file is not None and document is not None
+        config.update(
+            document=document,
+            file_name=opts.file.name,
+            file_size=len(document.encode("utf-8")),
+            is_markdown=opts.file.suffix.lower() in (".md", ".markdown"),
+        )
+    return config
+
+
+def run(opts: Options) -> int:
+    from bp.server import PrompterServer
+
+    document = load_document(opts.file) if opts.mode == "show" else None
+    token = secrets.token_urlsafe(32)
+    try:
+        server = PrompterServer(build_config(opts, document, token), opts.bind, opts.port)
+    except OSError as exc:
+        if opts.port:
+            raise UsageError(f"port {opts.port} in use or unavailable on {opts.bind}") from exc
+        raise UsageError(f"cannot listen on {opts.bind}: {exc}") from exc
+
+    def on_signal(signum: int, frame: object) -> None:
+        raise _Interrupted()
+
+    previous = {sig: signal.signal(sig, on_signal) for sig in (signal.SIGINT, signal.SIGTERM)}
+    try:
+        server.start()
+        url = f"http://{opts.url_host}:{server.port}/?k={token}"
+        print(f"Beautiful Prompter is waiting at {url}", file=sys.stderr, flush=True)
+        if should_open_browser(opts):
+            try:
+                webbrowser.open(url)
+            except Exception:  # noqa: BLE001 - best effort only
+                pass
+        outcome = server.wait(opts.timeout)
+    except _Interrupted:
+        return 130
+    finally:
+        server.close()
+        for sig, handler in previous.items():
+            signal.signal(sig, handler)
+
+    if outcome.kind == "answer":
+        assert outcome.text is not None
+        if opts.output is not None:
+            write_output_atomic(opts.output, outcome.text)
+        sys.stdout.buffer.write(outcome.text.encode("utf-8"))
+        sys.stdout.buffer.flush()
+        return 0
+    if outcome.kind == "cancel":
+        return 1
+    return 124
+
+
+def main(argv: list[str] | None = None) -> int:
     try:
         args = build_parser().parse_args(argv)
     except SystemExit as exc:
         return int(exc.code or 0)
     try:
-        opts = resolve_options(args, os.environ)
-        if opts.mode == "show":
-            load_document(opts.file)
+        return run(resolve_options(args, os.environ))
     except UsageError as exc:
         print(f"bp: {exc}", file=sys.stderr)
         return 2
-    print("bp: not implemented yet", file=sys.stderr)
-    return 2
