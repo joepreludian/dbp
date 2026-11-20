@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Tag matches the package version
+        run: |
+          [ "v$(python3 -c 'import sys; sys.path.insert(0, "src"); import bp; print(bp.__version__)')" = "$GITHUB_REF_NAME" ]
+      - name: Install pytest
+        run: python -m pip install pytest
+      - name: Run tests
+        run: python -m pytest -q
+      - name: Committed artifact matches a fresh build
+        run: |
+          bash scripts/build.sh
+          git diff --exit-code bin/bp.pyz
+      - name: Checksums
+        run: (cd bin && sha256sum bp.pyz > ../SHA256SUMS) && cat SHA256SUMS
+      - name: Release notes from the changelog
+        run: python scripts/changelog_section.py "${GITHUB_REF_NAME#v}" > RELEASE_NOTES.md
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          files: |
+            bin/bp.pyz
+            SHA256SUMS
