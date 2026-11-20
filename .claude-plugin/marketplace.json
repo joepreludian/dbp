@@ -1,0 +1,12 @@
+{
+  "name": "joepreludian",
+  "owner": { "name": "Jon Trigueiro" },
+  "description": "Beautiful Prompter: write prompts and review documents in a local browser page.",
+  "plugins": [
+    {
+      "name": "beautiful-prompter",
+      "source": "./",
+      "description": "Open a local web page to write a long prompt in markdown, or to review a generated document and answer it. The answer comes back to the agent."
+    }
+  ]
+}

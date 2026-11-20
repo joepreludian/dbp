@@ -3,7 +3,12 @@ name = "beautiful-prompter"
 dynamic = ["version"]
 description = "A tiny local web page for writing prompts and reviewing documents, driven by a Claude Code skill."
 requires-python = ">=3.10"
+license = "GPL-3.0-or-later"
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/joepreludian/dbp"
+Repository = "https://github.com/joepreludian/dbp"
 
 [tool.setuptools.dynamic]
 version = { attr = "bp.__version__" }
