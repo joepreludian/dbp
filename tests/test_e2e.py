@@ -19,7 +19,8 @@ URL_RE = re.compile(r"Beautiful Prompter is waiting at (http://([^:/]+):(\d+)/\?
 def start(*args, env=None):
     full_env = dict(os.environ, PYTHONUNBUFFERED="1", **(env or {}))
     for key in ("BP_BIND", "BP_URL_HOST", "BP_PORT"):
-        full_env.pop(key, None) if not (env and key in env) else None
+        if not (env and key in env):
+            full_env.pop(key, None)
     proc = subprocess.Popen(
         [sys.executable, "-m", "bp", *args, "--no-open"],
         cwd=SRC, env=full_env, stdin=subprocess.DEVNULL,

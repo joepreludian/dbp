@@ -60,3 +60,26 @@ def test_module_help():
         [sys.executable, "-m", "bp", "--help"], capture_output=True, text=True, cwd=SRC
     )
     assert out.returncode == 0 and "write" in out.stdout and "show" in out.stdout
+
+
+def test_port_out_of_range_is_usage_error():
+    for bad in ("70000", "-1"):
+        with pytest.raises(UsageError):
+            resolve_options(build_parser().parse_args(["write", "--port", bad]), {})
+
+
+def test_build_config_show_fields(tmp_path):
+    from bp.cli import Options, build_config
+
+    f = tmp_path / "doc.markdown"
+    opts = Options("show", f, "127.0.0.1", "localhost", 0, None, None, True, None)
+    cfg = build_config(opts, "héllo", "T")
+    assert cfg["file_size"] == 6 and cfg["is_markdown"] is True
+    assert cfg["file_path"] == str(f) and cfg["file_name"] == "doc.markdown"
+
+
+def test_build_config_non_markdown():
+    from bp.cli import Options, build_config
+
+    opts = Options("show", Path("notes.txt"), "127.0.0.1", "localhost", 0, None, None, True, None)
+    assert build_config(opts, "x", "T")["is_markdown"] is False

@@ -120,3 +120,14 @@ def test_oversized_content_length_is_rejected_before_reading(srv):
         head = sock.recv(64)
     assert head.startswith(b"HTTP/1.0 413") or head.startswith(b"HTTP/1.1 413")
     assert srv.wait(0.2) == Outcome("timeout", None)
+
+
+def test_fixed_port_can_be_reused_immediately():
+    first = PrompterServer(dict(CFG), "127.0.0.1", 0)
+    first.start()
+    port = first.port
+    assert post(first, "/answer", {"k": "tok-123", "text": "bye"})[0] == 200
+    first.wait(1)
+    second = PrompterServer(dict(CFG), "127.0.0.1", port)
+    assert second.port == port
+    second.close()

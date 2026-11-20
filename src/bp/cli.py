@@ -71,6 +71,8 @@ def resolve_options(args: argparse.Namespace, env: Mapping[str, str]) -> Options
             port = int(port_raw)
         except ValueError as exc:
             raise UsageError(f"BP_PORT must be an integer, got {port_raw!r}") from exc
+    if not 0 <= port <= 65535:
+        raise UsageError(f"port must be between 0 and 65535, got {port}")
     return Options(
         mode=args.mode,
         file=getattr(args, "file", None),
@@ -154,6 +156,7 @@ def build_config(opts: Options, document: str | None, token: str) -> dict:
         config.update(
             document=document,
             file_name=opts.file.name,
+            file_path=str(opts.file),
             file_size=len(document.encode("utf-8")),
             is_markdown=opts.file.suffix.lower() in (".md", ".markdown"),
         )

@@ -80,3 +80,20 @@ def test_missing_marked_is_reported_not_fatal():
 def test_theme_is_remembered_in_a_cookie():
     html = render_page(WRITE)
     assert "bpTheme=" in html and "document.cookie" in html
+
+
+def test_409_copy_has_no_retry():
+    assert "Already answered from another tab." in render_page(WRITE)
+
+
+def test_answer_box_is_resizable():
+    assert "#answer { resize: vertical; }" in render_page(SHOW)
+
+
+def test_meta_uses_file_path():
+    assert "cfg.file_path" in render_page(SHOW)
+
+
+def test_single_busy_flag_gates_send_and_cancel():
+    html = render_page(WRITE)
+    assert "var busy = false;" in html and "var sending" not in html

@@ -37,6 +37,7 @@
   html.dark { color-scheme: dark; }
   [hidden] { display: none !important; }
   textarea { resize: none; }
+  #answer { resize: vertical; }
   textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid #7a6f63; outline-offset: 2px; }
   html.dark textarea:focus-visible, html.dark button:focus-visible, html.dark a:focus-visible { outline-color: #9aa0ab; }
   .prose pre { white-space: pre-wrap; word-break: break-word; }
@@ -111,14 +112,14 @@
   var cfg = JSON.parse(document.getElementById("bp-config").textContent);
   var $ = function (id) { return document.getElementById(id); };
   var done = false;
-  var sending = false;
+  var busy = false;
 
   function source() { return cfg.mode === "write" ? $("editor") : $("answer"); }
 
   function refresh() {
     var text = source().value;
     $("count").textContent = text.length ? text.length + " chars" : "";
-    $("send").disabled = sending || !text.trim();
+    $("send").disabled = busy || !text.trim();
   }
 
   var canRender = typeof marked !== "undefined";
@@ -161,6 +162,7 @@
     }).then(function (res) {
       return res.json().catch(function () { return {}; }).then(function (data) {
         if (res.ok && data.ok) return data;
+        if (res.status === 409) throw new Error("Already answered from another tab. This process is exiting; nothing more can be sent here.");
         throw new Error("Couldn't send (HTTP " + res.status + (data.error ? ": " + data.error : "") + "). Your text is still here. Try again.");
       });
     }, function () {
@@ -169,16 +171,16 @@
   }
 
   function send() {
-    if (done || sending || $("send").disabled) return;
+    if (done || busy || $("send").disabled) return;
     if (!confirm(COPY.confirmSend)) return;
-    sending = true;
+    busy = true;
     $("error").hidden = true;
     $("send").textContent = "Sending...";
     refresh();
     post("/answer", { text: source().value }).then(function () {
       finish("sent");
     }, function (err) {
-      sending = false;
+      busy = false;
       $("send").textContent = "Send to Claude";
       refresh();
       showError(err.message);
@@ -187,11 +189,15 @@
 
   function cancel(event) {
     if (event) event.preventDefault();
-    if (done || sending) return;
+    if (done || busy) return;
     if (!confirm(COPY.confirmCancel)) return;
+    busy = true;
+    refresh();
     post("/cancel", {}).then(function () {
       finish("cancelled");
     }, function (err) {
+      busy = false;
+      refresh();
       showError(err.message);
     });
   }
@@ -243,7 +249,7 @@
       }
       var meta = document.createElement("p");
       meta.className = "text-xs text-paper-muted dark:text-ink-muted";
-      meta.textContent = cfg.file_name + " (" + cfg.file_size + " bytes)";
+      meta.textContent = cfg.file_path + " (" + cfg.file_size + " bytes)";
       doc.insertBefore(meta, doc.firstChild);
       $("answer").addEventListener("input", refresh);
     }

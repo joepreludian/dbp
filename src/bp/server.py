@@ -105,7 +105,7 @@ class _Handler(BaseHTTPRequestHandler):
 
 class _Server(ThreadingHTTPServer):
     daemon_threads = True
-    allow_reuse_address = False
+    allow_reuse_address = True  # a fixed BP_PORT must work again right after a run exits
 
     def __init__(self, address: tuple[str, int], token: str, page: bytes) -> None:
         super().__init__(address, _Handler)
