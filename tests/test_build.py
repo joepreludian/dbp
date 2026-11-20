@@ -37,3 +37,39 @@ def test_pyz_write_timeout_exit_124():
     )
     assert r.returncode == 124 and r.stdout == b""
     assert b"Beautiful Prompter is waiting at http://localhost:" in r.stderr
+
+
+import importlib.util
+import time
+
+_spec = importlib.util.spec_from_file_location("build_pyz", ROOT / "scripts" / "build_pyz.py")
+build_pyz = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(build_pyz)
+build = build_pyz.build
+
+
+def test_build_is_reproducible(tmp_path):
+    a, b = tmp_path / "a.pyz", tmp_path / "b.pyz"
+    build(ROOT / "src", a)
+    time.sleep(1.1)
+    build(ROOT / "src", b)
+    assert a.read_bytes() == b.read_bytes()
+
+
+def test_entries_are_normalized():
+    with zipfile.ZipFile(PYZ) as zf:
+        names = zf.namelist()
+        assert names == sorted(names)
+        for info in zf.infolist():
+            assert info.date_time == (2000, 1, 1, 0, 0, 0), info.filename
+            assert info.compress_type == zipfile.ZIP_STORED, info.filename
+            mode = (info.external_attr >> 16) & 0o777
+            expected = 0o755 if info.filename.endswith("/") else 0o644
+            assert mode == expected, (info.filename, oct(mode))
+        assert zf.read("__main__.py") == b"from bp.cli import entry\n\nentry()\n"
+
+
+def test_committed_pyz_matches_fresh_build(tmp_path):
+    fresh = tmp_path / "f.pyz"
+    build(ROOT / "src", fresh)
+    assert fresh.read_bytes() == PYZ.read_bytes()
