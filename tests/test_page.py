@@ -56,3 +56,10 @@ def _config_block(html: str) -> str:
     start = html.index(">", start) + 1
     end = html.index("</script>", start)
     return html[start:end]
+
+
+def test_hidden_attribute_beats_tailwind_display_classes():
+    # Tailwind's preflight rule for [hidden] has the same specificity as .flex/.grid
+    # and is emitted earlier, so without this override hidden blocks render anyway.
+    html = render_page(WRITE)
+    assert "[hidden] { display: none !important; }" in html
