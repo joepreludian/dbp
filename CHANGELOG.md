@@ -6,6 +6,8 @@ All notable changes to Beautiful Prompter are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-20
+
 ### Added
 - Installable as a Claude Code plugin from GitHub: `.claude-plugin/marketplace.json`
   with install instructions in the README.
