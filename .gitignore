@@ -3,3 +3,5 @@ docs/specs/
 __pycache__/
 *.pyc
 .pytest_cache/
+bin/__pycache__/
+dist/

@@ -1,0 +1,13 @@
+[project]
+name = "beautiful-prompter"
+dynamic = ["version"]
+description = "A tiny local web page for writing prompts and reviewing documents, driven by a Claude Code skill."
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.setuptools.dynamic]
+version = { attr = "bp.__version__" }
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
