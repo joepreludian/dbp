@@ -1,3 +1,3 @@
-from bp.cli import main
+from bp.cli import entry
 
-raise SystemExit(main())
+entry()

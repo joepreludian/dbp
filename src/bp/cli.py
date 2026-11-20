@@ -183,3 +183,8 @@ def main(argv: list[str] | None = None) -> int:
     except UsageError as exc:
         print(f"bp: {exc}", file=sys.stderr)
         return 2
+
+
+def entry() -> None:
+    """Console entry point: exit with main()'s return code (zipapp discards it otherwise)."""
+    sys.exit(main())
