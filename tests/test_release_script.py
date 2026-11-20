@@ -79,6 +79,8 @@ def test_release_refuses_missing_changelog_section(repo):
 
 def test_release_refuses_unreleased_entries(repo):
     text = (repo / "CHANGELOG.md").read_text()
+    # Give Unreleased an entry of its own, then add the target section below it.
+    text = text.replace("## [Unreleased]\n", "## [Unreleased]\n\n- not yet moved\n", 1)
     text = text.replace("## [0.1.1]", "## [9.0.0] - 2026-11-20\n\n- stuff\n\n## [0.1.1]", 1)
     (repo / "CHANGELOG.md").write_text(text)
     git(repo, "commit", "-q", "-am", "test")
