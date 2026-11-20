@@ -108,3 +108,15 @@ def test_large_answer_round_trips(srv):
 
 def test_timeout_outcome(srv):
     assert srv.wait(0.2) == Outcome("timeout", None)
+
+
+def test_oversized_content_length_is_rejected_before_reading(srv):
+    import socket
+    with socket.create_connection(("127.0.0.1", srv.port), timeout=5) as sock:
+        sock.sendall(
+            b"POST /answer HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\n"
+            b"Content-Length: 104857600\r\n\r\n"
+        )
+        head = sock.recv(64)
+    assert head.startswith(b"HTTP/1.0 413") or head.startswith(b"HTTP/1.1 413")
+    assert srv.wait(0.2) == Outcome("timeout", None)

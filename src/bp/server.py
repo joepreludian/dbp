@@ -12,6 +12,8 @@ from urllib.parse import parse_qs, urlsplit
 
 from bp.page import render_page
 
+MAX_BODY_BYTES = 64 * 1024 * 1024
+
 
 @dataclass(frozen=True)
 class Outcome:
@@ -21,6 +23,7 @@ class Outcome:
 
 class _Handler(BaseHTTPRequestHandler):
     server: "_Server"
+    timeout = 30  # seconds of socket inactivity before a stalled client is dropped
 
     def log_message(self, format: str, *args: object) -> None:  # noqa: A002 - stdlib signature
         pass
@@ -39,9 +42,15 @@ class _Handler(BaseHTTPRequestHandler):
     def _send_json(self, status: HTTPStatus, obj: dict) -> None:
         self._send(status, json.dumps(obj).encode("utf-8"), "application/json")
 
-    def _read_json(self) -> dict | None:
+    def _content_length(self) -> int | None:
         try:
-            length = int(self.headers.get("Content-Length", "0"))
+            length = int(self.headers.get("Content-Length", ""))
+        except ValueError:
+            return None
+        return length if length >= 0 else None
+
+    def _read_json(self, length: int) -> dict | None:
+        try:
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
         except (ValueError, UnicodeDecodeError):
             return None
@@ -65,7 +74,14 @@ class _Handler(BaseHTTPRequestHandler):
         if path not in ("/answer", "/cancel"):
             self._send_json(HTTPStatus.NOT_FOUND, {"ok": False, "error": "not found"})
             return
-        body = self._read_json()
+        length = self._content_length()
+        if length is None:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": "missing or invalid Content-Length"})
+            return
+        if length > MAX_BODY_BYTES:
+            self._send_json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"ok": False, "error": "body too large"})
+            return
+        body = self._read_json(length)
         if body is None:
             self._send_json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": "malformed JSON body"})
             return

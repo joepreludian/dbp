@@ -63,3 +63,20 @@ def test_hidden_attribute_beats_tailwind_display_classes():
     # and is emitted earlier, so without this override hidden blocks render anyway.
     html = render_page(WRITE)
     assert "[hidden] { display: none !important; }" in html
+
+
+def test_listeners_attach_before_any_markdown_render():
+    html = render_page(SHOW)
+    script = html[html.rindex("<script>"):]
+    assert script.index('addEventListener("click", send)') < script.index("renderMarkdown(doc")
+
+
+def test_missing_marked_is_reported_not_fatal():
+    html = render_page(SHOW)
+    assert 'typeof marked' in html  # the guard that makes a missing renderer non-fatal
+    assert "Couldn't load the markdown renderer" in html
+
+
+def test_theme_is_remembered_in_a_cookie():
+    html = render_page(WRITE)
+    assert "bpTheme=" in html and "document.cookie" in html

@@ -13,7 +13,7 @@ python3 bin/bp.pyz write [--output FILE] [--timeout SECONDS] [--no-open]
 python3 bin/bp.pyz show FILE [--output FILE] [--timeout SECONDS] [--no-open]
 ```
 
-The URL is printed on stderr. The answer goes to stdout (and to `--output`
+Needs Python 3.10 or newer; nothing else. The URL is printed on stderr. The answer goes to stdout (and to `--output`
 when given). Exit codes: 0 answer, 1 cancelled, 2 usage error, 124 timeout,
 130 interrupted.
 

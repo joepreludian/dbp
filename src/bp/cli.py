@@ -7,6 +7,7 @@ import os
 import secrets
 import signal
 import sys
+import threading
 import webbrowser
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,6 +17,7 @@ from bp import __version__
 
 DEFAULT_BIND = "127.0.0.1"
 DEFAULT_URL_HOST = "localhost"
+MIN_PYTHON = (3, 10)
 
 
 class UsageError(Exception):
@@ -103,6 +105,36 @@ def should_open_browser(opts: Options) -> bool:
     return opts.open_browser and opts.url_host in ("localhost", "127.0.0.1")
 
 
+def open_browser(url: str) -> None:
+    """Best-effort browser launch that never blocks the caller.
+
+    The stdlib may pick a console browser (lynx, w3m) on a headless box and
+    wait for it to exit, so the call runs in a daemon thread.
+    """
+
+    def target() -> None:
+        try:
+            webbrowser.open(url)
+        except Exception:  # noqa: BLE001 - best effort only
+            pass
+
+    threading.Thread(target=target, daemon=True).start()
+
+
+def python_version_ok(info: tuple[int, ...]) -> bool:
+    return tuple(info[:2]) >= MIN_PYTHON
+
+
+def prepare_output(path: Path) -> None:
+    """Make sure the answer file can be written before the user starts typing."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise UsageError(f"cannot create output directory {path.parent}: {exc}") from exc
+    if not os.access(path.parent, os.W_OK):
+        raise UsageError(f"output directory not writable: {path.parent}")
+
+
 def write_output_atomic(path: Path, text: str) -> None:
     """Write text to path so the file either exists complete or not at all."""
     path = Path(path)
@@ -132,6 +164,8 @@ def run(opts: Options) -> int:
     from bp.server import PrompterServer
 
     document = load_document(opts.file) if opts.mode == "show" else None
+    if opts.output is not None:
+        prepare_output(opts.output)
     token = secrets.token_urlsafe(32)
     try:
         server = PrompterServer(build_config(opts, document, token), opts.bind, opts.port)
@@ -149,10 +183,7 @@ def run(opts: Options) -> int:
         url = f"http://{opts.url_host}:{server.port}/?k={token}"
         print(f"Beautiful Prompter is waiting at {url}", file=sys.stderr, flush=True)
         if should_open_browser(opts):
-            try:
-                webbrowser.open(url)
-            except Exception:  # noqa: BLE001 - best effort only
-                pass
+            open_browser(url)
         outcome = server.wait(opts.timeout)
     except _Interrupted:
         return 130
@@ -163,10 +194,13 @@ def run(opts: Options) -> int:
 
     if outcome.kind == "answer":
         assert outcome.text is not None
-        if opts.output is not None:
-            write_output_atomic(opts.output, outcome.text)
         sys.stdout.buffer.write(outcome.text.encode("utf-8"))
         sys.stdout.buffer.flush()
+        if opts.output is not None:
+            try:
+                write_output_atomic(opts.output, outcome.text)
+            except OSError as exc:
+                print(f"bp: answer printed to stdout but could not be written to {opts.output}: {exc}", file=sys.stderr)
         return 0
     if outcome.kind == "cancel":
         return 1
@@ -187,4 +221,9 @@ def main(argv: list[str] | None = None) -> int:
 
 def entry() -> None:
     """Console entry point: exit with main()'s return code (zipapp discards it otherwise)."""
+    if not python_version_ok(sys.version_info):
+        found = ".".join(str(n) for n in sys.version_info[:3])
+        need = ".".join(str(n) for n in MIN_PYTHON)
+        print(f"bp: needs Python {need} or newer, found {found}", file=sys.stderr)
+        sys.exit(2)
     sys.exit(main())

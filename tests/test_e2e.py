@@ -133,3 +133,40 @@ def test_write_output_atomic_replaces_existing(tmp_path):
 def test_should_open_browser(url_host, open_flag, expected):
     opts = Options("write", None, "127.0.0.1", url_host, 0, None, None, open_flag, None)
     assert should_open_browser(opts) is expected
+
+
+def test_output_parent_dir_is_created(tmp_path):
+    answer_file = tmp_path / "missing" / "deeper" / "a.md"
+    proc, _, _, port, token = start("write", "--output", str(answer_file))
+    assert post(port, "/answer", {"k": token, "text": "kept"}) == 200
+    code, out, _ = finish(proc)
+    assert code == 0 and out == b"kept" and answer_file.read_bytes() == b"kept"
+
+
+def test_unwritable_output_is_usage_error_before_serving():
+    proc = subprocess.run(
+        [sys.executable, "-m", "bp", "write", "--no-open", "--output", "/dev/null/sub/a.md"],
+        cwd=SRC, capture_output=True, timeout=10,
+    )
+    assert proc.returncode == 2
+    assert b"output" in proc.stderr and b"waiting at" not in proc.stderr
+
+
+def test_open_browser_does_not_block(monkeypatch):
+    import time
+    from bp import cli
+
+    def slow_open(url):
+        time.sleep(2)
+        return True
+
+    monkeypatch.setattr(cli.webbrowser, "open", slow_open)
+    started = time.monotonic()
+    cli.open_browser("http://localhost:1/")
+    assert time.monotonic() - started < 0.5
+
+
+@pytest.mark.parametrize("info,ok", [((3, 10, 0), True), ((3, 14, 4), True), ((3, 9, 6), False), ((3, 8, 10), False)])
+def test_python_version_ok(info, ok):
+    from bp.cli import python_version_ok
+    assert python_version_ok(info) is ok

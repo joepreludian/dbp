@@ -7,7 +7,10 @@
 <script>
   (function () {
     try {
-      var stored = localStorage.getItem("bpTheme");
+      // A cookie, not localStorage: the port changes on every run, and localStorage
+      // is scoped per origin (host + port), so it would never be seen again.
+      var m = document.cookie.match(/(?:^|; )bpTheme=(dark|light)/);
+      var stored = m ? m[1] : null;
       var dark = stored ? stored === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
       if (dark) document.documentElement.classList.add("dark");
     } catch (e) {}
@@ -118,8 +121,18 @@
     $("send").disabled = sending || !text.trim();
   }
 
+  var canRender = typeof marked !== "undefined";
+
   function renderMarkdown(target, text) {
-    target.innerHTML = marked.parse(text, { gfm: true });
+    if (canRender) {
+      target.innerHTML = marked.parse(text, { gfm: true });
+      return;
+    }
+    var pre = document.createElement("pre");
+    var code = document.createElement("code");
+    code.textContent = text;
+    pre.appendChild(code);
+    target.replaceChildren(pre);
   }
 
   function showError(message) {
@@ -185,13 +198,26 @@
 
   function toggleTheme() {
     var dark = document.documentElement.classList.toggle("dark");
-    try { localStorage.setItem("bpTheme", dark ? "dark" : "light"); } catch (e) {}
+    try { document.cookie = "bpTheme=" + (dark ? "dark" : "light") + "; Max-Age=31536000; Path=/; SameSite=Lax"; } catch (e) {}
   }
 
   (function init() {
     var brand = cfg.title || "Beautiful Prompter";
     $("brand").textContent = brand;
     document.title = brand;
+
+    $("send").addEventListener("click", send);
+    $("cancel").addEventListener("click", cancel);
+    $("theme-toggle").addEventListener("click", toggleTheme);
+    document.addEventListener("keydown", function (e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); send(); }
+    });
+    window.addEventListener("beforeunload", function (e) {
+      if (!done && source().value.trim()) { e.preventDefault(); e.returnValue = ""; }
+    });
+    if (!canRender) {
+      showError("Couldn't load the markdown renderer from cdnjs.cloudflare.com. Text is shown unrendered; you can still send your answer.");
+    }
 
     if (cfg.mode === "write") {
       $("pill").textContent = "Writing a prompt for Claude";
@@ -222,15 +248,6 @@
       $("answer").addEventListener("input", refresh);
     }
 
-    $("send").addEventListener("click", send);
-    $("cancel").addEventListener("click", cancel);
-    $("theme-toggle").addEventListener("click", toggleTheme);
-    document.addEventListener("keydown", function (e) {
-      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); send(); }
-    });
-    window.addEventListener("beforeunload", function (e) {
-      if (!done && source().value.trim()) { e.preventDefault(); e.returnValue = ""; }
-    });
     refresh();
     source().focus();
   })();
