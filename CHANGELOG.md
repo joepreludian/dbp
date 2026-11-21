@@ -6,6 +6,8 @@ All notable changes to Beautiful Prompter are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-21
+
 ### Changed
 - Show mode puts the document and the answer in two centered boxes on the
   page background, matching the write screen; the header pill truncates
