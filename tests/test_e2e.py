@@ -114,6 +114,9 @@ def test_show_mode_serves_document(tmp_path):
     with urllib.request.urlopen(f"http://127.0.0.1:{port}/?k={token}", timeout=5) as res:
         html = res.read().decode()
     assert '"mode": "show"' in html and "\\u003c/script>" in html and "spec.md" in html
+    from bp import __version__
+
+    assert f'"version": "{__version__}"' in html and 'id="version"' in html
     assert post(port, "/answer", {"k": token, "text": "fine"}) == 200
     code, out, _ = finish(proc)
     assert code == 0 and out == b"fine"

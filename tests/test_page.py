@@ -10,7 +10,7 @@ SHOW = {
     "context": CONTEXT,
 }
 IDS = ["editor", "preview", "answer", "send", "cancel", "theme-toggle", "count", "error", "idle", "document",
-       "context", "tab-write", "tab-preview"]
+       "context", "tab-write", "tab-preview", "version", "idle-version"]
 
 
 def test_embed_json_escapes_script_close():
@@ -133,3 +133,41 @@ def test_source_is_editor_in_write_mode_regardless_of_tab():
     html = render_page(WRITE)
     script = html[html.rindex("<script>"):]
     assert 'function source() { return cfg.mode === "write" ? $("editor") : $("answer"); }' in script
+
+
+def _show_section(html: str) -> str:
+    return html[html.index('id="show"'):html.index("</main>")]
+
+
+def test_show_section_is_two_boxes():
+    section = _show_section(render_page(SHOW))
+    boxes = [i for i in range(len(section)) if section.startswith("max-w-3xl", i)]
+    assert len(boxes) == 2
+    first, second = boxes
+    assert first < section.index('id="document"') < second < section.index('id="answer"')
+    assert section.count("dark:bg-ink-surface") == 2
+    doc_box = section[first:second]
+    assert "overflow-y-auto" in doc_box and "min-h-0" in doc_box
+    assert "border-t border-paper-border" not in section  # the old full-width answer bar
+
+
+def test_error_strip_outside_boxes():
+    html = render_page(SHOW)
+    assert html.index("</main>") < html.index('id="error"') < html.index("<footer")
+
+
+def test_version_shown_from_config():
+    html = render_page(WRITE)
+    footer = html[html.index("<footer"):html.index("</footer>")]
+    assert 'id="version"' in footer
+    idle = html[html.index('id="idle"'):html.rindex("<script>")]
+    assert 'id="idle-version"' in idle
+    script = html[html.rindex("<script>"):]
+    assert '"Beautiful Prompter " + cfg.version' in script
+
+
+def test_pill_truncates():
+    html = render_page(SHOW)
+    header = html[html.index("<header"):html.index("</header>")]
+    pill = header[header.index('id="pill"'):header.index(">", header.index('id="pill"'))]
+    assert "truncate" in pill and "min-w-0" in pill

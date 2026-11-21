@@ -49,7 +49,7 @@
 <div id="app" class="h-full flex flex-col">
   <header class="flex items-center gap-4 px-5 py-2.5 text-sm border-b border-paper-border bg-paper-surface dark:border-ink-border dark:bg-ink-surface">
     <span id="brand" class="font-semibold tracking-tight">Beautiful Prompter</span>
-    <span id="pill" class="rounded-full px-3 py-0.5 text-xs bg-paper-border/70 text-paper-muted dark:bg-ink-border dark:text-ink-muted"></span>
+    <span id="pill" class="min-w-0 truncate rounded-full px-3 py-0.5 text-xs bg-paper-border/70 text-paper-muted dark:bg-ink-border dark:text-ink-muted"></span>
     <span class="flex-1"></span>
     <span id="context" hidden class="min-w-0 truncate text-xs text-paper-muted dark:text-ink-muted"></span>
     <button id="theme-toggle" type="button" title="Switch between light and dark" aria-label="Switch between light and dark"
@@ -74,16 +74,14 @@
       </div>
     </section>
 
-    <section id="show" hidden class="h-full flex flex-col">
-      <div class="flex-1 min-h-0 overflow-y-auto">
-        <article id="document" class="prose prose-sm md:prose-base max-w-3xl mx-auto px-6 py-8 dark:prose-invert"></article>
+    <section id="show" hidden class="h-full flex flex-col items-center gap-3 px-4 pt-4">
+      <div class="w-full max-w-3xl flex-1 min-h-0 overflow-y-auto rounded-lg border border-paper-border bg-paper-surface dark:border-ink-border dark:bg-ink-surface">
+        <article id="document" class="prose prose-sm md:prose-base max-w-none px-6 py-6 dark:prose-invert"></article>
       </div>
-      <div class="border-t border-paper-border bg-paper-surface dark:border-ink-border dark:bg-ink-surface">
-        <div class="max-w-3xl mx-auto px-6 pt-4 pb-2">
-          <label for="answer" class="block text-xs mb-1.5 text-paper-muted dark:text-ink-muted">Your answer</label>
-          <textarea id="answer" rows="5" placeholder="What do you think? Markdown works here too."
-                    class="w-full rounded-lg p-3 text-sm leading-relaxed bg-paper-bg border border-paper-border dark:bg-ink-bg dark:border-ink-border placeholder:text-paper-muted/70 dark:placeholder:text-ink-muted/70"></textarea>
-        </div>
+      <div class="w-full max-w-3xl rounded-t-lg border border-b-0 border-paper-border bg-paper-surface px-5 pt-3 pb-4 dark:border-ink-border dark:bg-ink-surface">
+        <label for="answer" class="block text-xs mb-1.5 text-paper-muted dark:text-ink-muted">Your answer</label>
+        <textarea id="answer" rows="5" placeholder="What do you think? Markdown works here too."
+                  class="w-full rounded-lg p-3 text-sm leading-relaxed bg-paper-bg border border-paper-border dark:bg-ink-bg dark:border-ink-border placeholder:text-paper-muted/70 dark:placeholder:text-ink-muted/70"></textarea>
       </div>
     </section>
   </main>
@@ -93,6 +91,7 @@
   <footer class="flex items-center gap-4 px-5 py-2.5 text-xs border-t border-paper-border bg-paper-surface text-paper-muted dark:border-ink-border dark:bg-ink-surface dark:text-ink-muted">
     <span>Markdown. <kbd class="rounded px-1 bg-paper-border/70 dark:bg-ink-border font-mono">Cmd/Ctrl+Enter</kbd> to send</span>
     <span id="count"></span>
+    <span id="version" class="text-paper-muted/80 dark:text-ink-muted/80"></span>
     <span class="flex-1"></span>
     <a id="cancel" href="#" class="underline underline-offset-2 hover:text-paper-ink dark:hover:text-ink-text">Cancel</a>
     <button id="send" type="button" disabled
@@ -105,6 +104,7 @@
     <div id="idle-mark" class="mx-auto mb-4 h-12 w-12 rounded-full flex items-center justify-center text-2xl bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">&#10003;</div>
     <h1 id="idle-title" class="text-lg font-semibold">Sent. Go back to your terminal.</h1>
     <p id="idle-text" class="mt-1 text-sm text-paper-muted dark:text-ink-muted">Claude has your message. You can close this tab.</p>
+    <p id="idle-version" class="mt-4 text-xs text-paper-muted/80 dark:text-ink-muted/80"></p>
   </div>
 </div>
 
@@ -255,6 +255,9 @@
     var brand = cfg.title || "Beautiful Prompter";
     $("brand").textContent = brand;
     document.title = brand;
+    var versionText = "Beautiful Prompter " + cfg.version;
+    $("version").textContent = versionText;
+    $("idle-version").textContent = versionText;
 
     $("send").addEventListener("click", send);
     $("cancel").addEventListener("click", cancel);
