@@ -9,10 +9,12 @@ import signal
 import subprocess
 import sys
 import threading
+import time
 import webbrowser
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
+from urllib.parse import urlsplit
 
 from bp import __version__
 
@@ -152,32 +154,62 @@ def write_output_atomic(path: Path, text: str) -> None:
 
 
 def repo_slug(url: str) -> str | None:
-    """Reduce a git remote URL to ``owner/name``; None when it has no such shape."""
-    url = url.strip().rstrip("/")
-    if url.endswith(".git"):
-        url = url[: -len(".git")]
-    parts = [p for p in url.replace(":", "/").split("/") if p]
-    # host + owner + name at minimum; "file:///repo" and "repo" have no owner.
-    if len(parts) < 3:
+    """Reduce a git remote URL to ``owner/name``; None when it has no such shape.
+
+    Only the path part is used, so user names, tokens and ports in the URL can
+    never reach the page.
+    """
+    url = url.strip()
+    if "://" in url:
+        path = urlsplit(url).path
+    elif ":" in url and "/" not in url.split(":", 1)[0]:
+        path = url.split(":", 1)[1]  # scp-like host:path
+    else:
+        path = url
+    path = path.rstrip("/")
+    if path.endswith(".git"):
+        path = path[: -len(".git")]
+    parts = [p for p in path.split("/") if p]
+    if len(parts) < 2:
         return None
     return f"{parts[-2]}/{parts[-1]}"
 
 
-def _git_output(cwd: Path, *args: str) -> str | None:
+class _GitTimeout(Exception):
+    """The git budget for one run is spent; stop asking."""
+
+
+def _git_output(cwd: Path, deadline: float, *args: str) -> str | None:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise _GitTimeout()
     try:
-        proc = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, timeout=GIT_TIMEOUT)
+        proc = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, timeout=remaining)
+    except subprocess.TimeoutExpired as exc:
+        raise _GitTimeout() from exc
     except (OSError, subprocess.SubprocessError):
         return None
     return proc.stdout.strip() if proc.returncode == 0 else None
 
 
 def detect_context(cwd: Path) -> dict:
-    """Folder, repository and branch for the page header. Never raises."""
+    """Folder, repository and branch for the page header. Never raises.
+
+    All git calls share one GIT_TIMEOUT budget; the first that runs out ends
+    detection with whatever was found so far.
+    """
     context: dict = {"folder": cwd.name, "path": str(cwd), "repo": None, "branch": None}
-    if _git_output(cwd, "rev-parse", "--is-inside-work-tree") != "true":
-        return context
-    context["branch"] = _git_output(cwd, "branch", "--show-current") or _git_output(cwd, "rev-parse", "--short", "HEAD")
-    context["repo"] = repo_slug(_git_output(cwd, "remote", "get-url", "origin") or "")
+    deadline = time.monotonic() + GIT_TIMEOUT
+    try:
+        if _git_output(cwd, deadline, "rev-parse", "--is-inside-work-tree") != "true":
+            return context
+        context["branch"] = (
+            _git_output(cwd, deadline, "branch", "--show-current")
+            or _git_output(cwd, deadline, "rev-parse", "--short", "HEAD")
+        )
+        context["repo"] = repo_slug(_git_output(cwd, deadline, "remote", "get-url", "origin") or "")
+    except _GitTimeout:
+        pass
     return context
 
 

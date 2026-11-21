@@ -174,3 +174,36 @@ def test_build_config_includes_context(tmp_path):
     ctx = {"folder": "f", "path": "/f", "repo": None, "branch": None}
     assert build_config(opts, None, "T", context=ctx)["context"] == ctx
     assert set(build_config(opts, None, "T")["context"]) == {"folder", "path", "repo", "branch"}
+
+
+def test_repo_slug_never_includes_userinfo_or_port():
+    from bp.cli import repo_slug
+
+    assert repo_slug("https://user:s3cret@git.example.com/repo.git") is None
+    assert repo_slug("https://oauth2:tok@gitlab.com/group/project.git") == "group/project"
+    assert repo_slug("ssh://git@host:22/repo") is None
+    assert repo_slug("ssh://git@host:22/owner/repo.git") == "owner/repo"
+    assert repo_slug("https://host/a/b/c/repo") == "c/repo"
+    assert repo_slug("/home/me/repos/foo") == "repos/foo"
+    assert repo_slug("git@github.com:joepreludian/dbp.git") == "joepreludian/dbp"
+
+
+def test_detect_context_shares_one_deadline(tmp_path, monkeypatch):
+    import bp.cli as cli
+
+    calls = []
+
+    class Done:
+        returncode = 0
+        stdout = "true\n"
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        if len(calls) == 1:
+            return Done()
+        raise subprocess.TimeoutExpired(cmd, kw.get("timeout", 0))
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    ctx = cli.detect_context(tmp_path)
+    assert ctx["repo"] is None and ctx["branch"] is None
+    assert len(calls) == 2
