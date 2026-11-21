@@ -171,3 +171,15 @@ def test_open_browser_does_not_block(monkeypatch):
 def test_python_version_ok(info, ok):
     from bp.cli import python_version_ok
     assert python_version_ok(info) is ok
+
+
+def test_write_page_embeds_working_directory_context():
+    proc, _, _, port, token = start("write")
+    with urllib.request.urlopen(f"http://127.0.0.1:{port}/?k={token}", timeout=5) as res:
+        html = res.read().decode()
+    begin = html.index('id="bp-config">') + len('id="bp-config">')
+    cfg = json.loads(html[begin:html.index("</script>", begin)])
+    assert cfg["context"]["folder"] == "src" and cfg["context"]["path"].endswith("/src")
+    assert set(cfg["context"]) == {"folder", "path", "repo", "branch"}
+    assert post(port, "/cancel", {"k": token}) == 200
+    assert finish(proc)[0] == 1

@@ -6,6 +6,7 @@ import argparse
 import os
 import secrets
 import signal
+import subprocess
 import sys
 import threading
 import webbrowser
@@ -18,6 +19,7 @@ from bp import __version__
 DEFAULT_BIND = "127.0.0.1"
 DEFAULT_URL_HOST = "localhost"
 MIN_PYTHON = (3, 10)
+GIT_TIMEOUT = 2.0  # seconds; a slow or hung git must not delay the page noticeably
 
 
 class UsageError(Exception):
@@ -149,8 +151,39 @@ def write_output_atomic(path: Path, text: str) -> None:
     os.replace(tmp, path)
 
 
-def build_config(opts: Options, document: str | None, token: str) -> dict:
+def repo_slug(url: str) -> str | None:
+    """Reduce a git remote URL to ``owner/name``; None when it has no such shape."""
+    url = url.strip().rstrip("/")
+    if url.endswith(".git"):
+        url = url[: -len(".git")]
+    parts = [p for p in url.replace(":", "/").split("/") if p]
+    # host + owner + name at minimum; "file:///repo" and "repo" have no owner.
+    if len(parts) < 3:
+        return None
+    return f"{parts[-2]}/{parts[-1]}"
+
+
+def _git_output(cwd: Path, *args: str) -> str | None:
+    try:
+        proc = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, timeout=GIT_TIMEOUT)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return proc.stdout.strip() if proc.returncode == 0 else None
+
+
+def detect_context(cwd: Path) -> dict:
+    """Folder, repository and branch for the page header. Never raises."""
+    context: dict = {"folder": cwd.name, "path": str(cwd), "repo": None, "branch": None}
+    if _git_output(cwd, "rev-parse", "--is-inside-work-tree") != "true":
+        return context
+    context["branch"] = _git_output(cwd, "branch", "--show-current") or _git_output(cwd, "rev-parse", "--short", "HEAD")
+    context["repo"] = repo_slug(_git_output(cwd, "remote", "get-url", "origin") or "")
+    return context
+
+
+def build_config(opts: Options, document: str | None, token: str, context: dict | None = None) -> dict:
     config: dict = {"mode": opts.mode, "token": token, "title": opts.title, "version": __version__}
+    config["context"] = context if context is not None else detect_context(Path.cwd())
     if opts.mode == "show":
         assert opts.file is not None and document is not None
         config.update(

@@ -83,3 +83,94 @@ def test_build_config_non_markdown():
 
     opts = Options("show", Path("notes.txt"), "127.0.0.1", "localhost", 0, None, None, True, None)
     assert build_config(opts, "x", "T")["is_markdown"] is False
+
+
+def test_repo_slug_forms():
+    from bp.cli import repo_slug
+
+    assert repo_slug("git@github.com:joepreludian/dbp.git") == "joepreludian/dbp"
+    assert repo_slug("https://github.com/joepreludian/dbp.git") == "joepreludian/dbp"
+    assert repo_slug("https://github.com/joepreludian/dbp") == "joepreludian/dbp"
+    assert repo_slug("ssh://git@host/owner/repo/") == "owner/repo"
+
+
+def test_repo_slug_odd_urls():
+    from bp.cli import repo_slug
+
+    assert repo_slug("file:///repo") is None
+    assert repo_slug("repo") is None
+    assert repo_slug("") is None
+
+
+def _git(cwd, *args):
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
+
+
+def _repo(tmp_path):
+    _git(tmp_path, "init", "-q", "-b", "main")
+    _git(tmp_path, "-c", "user.email=t@t", "-c", "user.name=t", "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "init")
+    return tmp_path
+
+
+def test_detect_context_plain_directory(tmp_path):
+    from bp.cli import detect_context
+
+    d = tmp_path / "plain"
+    d.mkdir()
+    assert detect_context(d) == {"folder": "plain", "path": str(d), "repo": None, "branch": None}
+
+
+def test_detect_context_repo_with_remote(tmp_path):
+    from bp.cli import detect_context
+
+    repo = _repo(tmp_path)
+    _git(repo, "remote", "add", "origin", "git@github.com:joepreludian/dbp.git")
+    ctx = detect_context(repo)
+    assert ctx["repo"] == "joepreludian/dbp" and ctx["branch"] == "main"
+    assert ctx["folder"] == tmp_path.name
+
+
+def test_detect_context_repo_without_remote(tmp_path):
+    from bp.cli import detect_context
+
+    ctx = detect_context(_repo(tmp_path))
+    assert ctx["repo"] is None and ctx["branch"] == "main"
+
+
+def test_detect_context_detached_head(tmp_path):
+    from bp.cli import detect_context
+
+    repo = _repo(tmp_path)
+    sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=repo, capture_output=True, text=True).stdout.strip()
+    _git(repo, "checkout", "-q", "--detach")
+    assert detect_context(repo)["branch"] == sha
+
+
+def test_detect_context_without_git(tmp_path, monkeypatch):
+    from bp.cli import detect_context
+
+    monkeypatch.setenv("PATH", "")
+    assert detect_context(tmp_path)["repo"] is None
+
+
+def test_detect_context_timeout_falls_back(tmp_path, monkeypatch):
+    import bp.cli as cli
+
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        raise subprocess.TimeoutExpired(cmd, kw.get("timeout", 0))
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    assert cli.detect_context(tmp_path) == {"folder": tmp_path.name, "path": str(tmp_path), "repo": None, "branch": None}
+    assert len(calls) == 1
+
+
+def test_build_config_includes_context(tmp_path):
+    from bp.cli import Options, build_config
+
+    opts = Options("write", None, "127.0.0.1", "localhost", 0, None, None, True, None)
+    ctx = {"folder": "f", "path": "/f", "repo": None, "branch": None}
+    assert build_config(opts, None, "T", context=ctx)["context"] == ctx
+    assert set(build_config(opts, None, "T")["context"]) == {"folder", "path", "repo", "branch"}
