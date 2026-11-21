@@ -2,12 +2,15 @@ import json
 
 from bp.page import embed_json, render_page
 
-WRITE = {"mode": "write", "token": "T", "title": None, "version": "0"}
+CONTEXT = {"folder": "src", "path": "/x/src", "repo": "joepreludian/dbp", "branch": "main"}
+WRITE = {"mode": "write", "token": "T", "title": None, "version": "0", "context": CONTEXT}
 SHOW = {
     "mode": "show", "token": "T", "title": None, "version": "0",
     "document": "# Hi </script><!-- x", "file_name": "a.md", "file_size": 12, "is_markdown": True,
+    "context": CONTEXT,
 }
-IDS = ["editor", "preview", "answer", "send", "cancel", "theme-toggle", "count", "error", "idle", "document"]
+IDS = ["editor", "preview", "answer", "send", "cancel", "theme-toggle", "count", "error", "idle", "document",
+       "context", "tab-write", "tab-preview"]
 
 
 def test_embed_json_escapes_script_close():
@@ -97,3 +100,36 @@ def test_meta_uses_file_path():
 def test_single_busy_flag_gates_send_and_cancel():
     html = render_page(WRITE)
     assert "var busy = false;" in html and "var sending" not in html
+
+
+def test_write_section_is_single_column_with_tabs():
+    html = render_page(WRITE)
+    assert "md:grid-cols-2" not in html and "md:grid-rows-1" not in html
+    section = html[html.index('id="write"'):html.index('id="show"')]
+    assert 'id="tab-write"' in section and 'id="tab-preview"' in section
+    assert 'id="preview" hidden' in section
+    assert "max-w-3xl" in section
+
+
+def test_context_render_guards_missing_context():
+    html = render_page({"mode": "write", "token": "T", "title": None, "version": "0"})
+    assert "cfg.context || {}" in html
+
+
+def test_context_truncates():
+    html = render_page(WRITE)
+    header = html[html.index("<header"):html.index("</header>")]
+    assert 'id="context"' in header and "truncate" in header
+
+
+def test_preview_tab_uses_shared_renderer():
+    html = render_page(WRITE)
+    script = html[html.rindex("<script>"):]
+    assert 'renderMarkdown($("preview"), $("editor").value)' in script
+    assert "function showTab(" in script
+
+
+def test_source_is_editor_in_write_mode_regardless_of_tab():
+    html = render_page(WRITE)
+    script = html[html.rindex("<script>"):]
+    assert 'function source() { return cfg.mode === "write" ? $("editor") : $("answer"); }' in script
