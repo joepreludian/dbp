@@ -6,6 +6,8 @@ All notable changes to Beautiful Prompter are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-21
+
 ### Changed
 - Write mode is one centered markdown editor with Write and Preview tabs
   instead of a side-by-side editor and live preview.
