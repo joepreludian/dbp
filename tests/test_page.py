@@ -171,3 +171,12 @@ def test_pill_truncates():
     header = html[html.index("<header"):html.index("</header>")]
     pill = header[header.index('id="pill"'):header.index(">", header.index('id="pill"'))]
     assert "truncate" in pill and "min-w-0" in pill
+
+
+def test_version_hides_on_narrow_screens():
+    # The footer does not wrap; the version is the one thing that can be dropped
+    # below the sm breakpoint without losing a control.
+    html = render_page(WRITE)
+    footer = html[html.index("<footer"):html.index("</footer>")]
+    version = footer[footer.index('id="version"'):footer.index(">", footer.index('id="version"'))]
+    assert "hidden sm:inline" in version
