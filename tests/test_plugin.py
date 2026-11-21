@@ -44,3 +44,9 @@ def test_skill_show_example_is_absolute():
     text = _skill()
     show_lines = [l for l in text.splitlines() if "bp.pyz\" show " in l]
     assert show_lines and all(" show /" in l for l in show_lines), show_lines
+
+
+def test_skill_describes_tabs_not_live_preview():
+    text = _skill()
+    assert "live preview" not in text
+    assert "Preview tab" in text

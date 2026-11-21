@@ -6,6 +6,14 @@ All notable changes to Beautiful Prompter are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Write mode is one centered markdown editor with Write and Preview tabs
+  instead of a side-by-side editor and live preview.
+
+### Added
+- The header shows the folder, git repository (from `origin`) and branch the
+  process was started in; outside a repository only the folder is shown.
+
 ## [0.2.0] - 2026-11-20
 
 ### Added

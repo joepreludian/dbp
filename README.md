@@ -2,9 +2,10 @@
 
 A Claude Code plugin with a tiny command-line tool, `bp`, that opens a local
 web page, blocks until you answer, prints the answer and exits. Two modes:
-`bp write` gives you a markdown editor with live preview to compose a prompt;
+`bp write` gives you a centered markdown editor with a Preview tab to compose a prompt;
 `bp show FILE` renders a markdown file for review with an answer box below.
-One process per call, standard library only, Python 3.10 or newer.
+One process per call, standard library only, Python 3.10 or newer. The header
+shows the folder, repository and branch the process was started in.
 
 Say "open in bp" in Claude Code and the agent opens the editor for you. After
 the agent writes a long document, it offers to show it there for review.

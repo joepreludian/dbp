@@ -10,7 +10,7 @@ writes that answer to a file, and exits. Two modes:
 
 | Mode | Command | The user sees | You get back |
 |------|---------|---------------|--------------|
-| write | `bp write` | a markdown editor with live preview | the prompt they wrote |
+| write | `bp write` | a centered markdown editor with a Preview tab | the prompt they wrote |
 | show | `bp show FILE` | FILE rendered, an answer box below | their answer about FILE |
 
 The executable is `${CLAUDE_PLUGIN_ROOT}/bin/bp.pyz`. It needs only `python3`.
